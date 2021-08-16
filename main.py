@@ -7,11 +7,12 @@ from aiogram.utils.exceptions import MessageNotModified
 
 from teacher import Teacher
 
-from typing import Union
-
 from threading import Thread
 from datetime import datetime
 from time import sleep
+
+from typing import Union
+
 
 bot = Bot('1941908944:AAH-74UPpJW4ZcxUwx67lZdDTi_5Sib_S3o')
 dp = Dispatcher(bot)
@@ -32,7 +33,7 @@ def remove_ended_lessons():
         day = int(date.split('.')[0].strip())
 
         time = lesson_time.split(':')[1].strip()
-        hour = int(time.split('.')[0].strip())
+        hour = int(time.split('.')[0].strip()) + 1
         minutes = int(time.split('.')[1].strip())
 
         return curr_datetime > datetime(2021, month, day, hour, minutes)
@@ -110,12 +111,12 @@ async def start(message: types.Message):
 
     teachers = ['wargkul', 'nizhnitschek', 'maxbenival']
     if message.from_user.username not in teachers:
-        await bot.send_message(message.chat.id, text='Цим ботом можуть користуватися лише викладачі онлайн-школи T&C')
+        await bot.send_message(message.chat.id, text='⚠ Цим ботом можуть користуватися лише викладачі онлайн-школи T&C')
 
     if start_pressed:
         Thread(target=remove_ended_lessons).start()
 
-        await bot.send_message(message.chat.id, text='Введіть ваше ім\'я та нікнейм у телеграмі\n'
+        await bot.send_message(message.chat.id, text='🔡 Введіть ваше ім\'я та нікнейм у телеграмі\n'
                                                      'Приклад: Коля, @nizhnitschek')
         name_expected = True
         start_pressed = False
@@ -128,9 +129,32 @@ async def text_handler(message: types.Message):
 
     try:
         if not (name_expected or selecting_expected or schedule_expected):
-            if message.text == 'Змінити класи 🏫':
-                edit_classes, edit_schedule, add_lesson, delete_lesson, edit_lesson = False, False, False, False, False
+            if message.text == 'Назад ⬅️':
+                funcs_kb = create_kb(
+                    'Мій розклад 📅', 'Уроки 📚',
+                    'Змінити класи 🏫', 'Налаштування ⚙'
+                )
 
+                await bot.send_message(message.chat.id, text='.', reply_markup=funcs_kb)
+
+            elif message.text == 'Мій розклад 📅':
+                schedule_kb = create_kb(
+                    'Подивитися уроки на сьогодні 👁', 'Подивитися уроки на дату 🗓',
+                    'Змінити розклад 📋', 'Назад ⬅️'
+                )
+
+                await bot.send_message(message.chat.id, text='.', reply_markup=schedule_kb)
+
+            elif message.text == 'Уроки 📚':
+                lessons_kb = create_kb(
+                    'Додати урок ➕', 'Видалити урок ➖',
+                    'Змінити урок ✏', 'Назад ⬅️'
+                )
+
+                await bot.send_message(message.chat.id, text='.', reply_markup=lessons_kb)
+
+            elif message.text == 'Змінити класи 🏫':
+                edit_classes, edit_schedule, add_lesson, delete_lesson, edit_lesson = False, False, False, False, False
                 new_classes_kb = True
 
                 classes_kb = create_kb(
@@ -140,91 +164,100 @@ async def text_handler(message: types.Message):
                     kb_type='inline', tick_places=classes
                 )
 
-                await bot.send_message(message.chat.id, text='Виберіть класи:', reply_markup=classes_kb)
+                await bot.send_message(message.chat.id, text='🔀 Виберіть класи:', reply_markup=classes_kb)
 
-            elif message.text == 'Змінити розклад 📅':
+            elif message.text == 'Налаштування ⚙':
+                pass
+
+            elif message.text == 'Змінити розклад 📋':
                 edit_classes, edit_schedule, add_lesson, delete_lesson, edit_lesson = False, True, False, False, False
-                await bot.send_message(message.chat.id, text=f'Відправте відредагований розклад\n`{schedule}`',
+                await bot.send_message(message.chat.id, text=f'🔡 Відправте відредагований розклад\n`{schedule}`',
                                        parse_mode='Markdown')
+
+            elif message.text == 'Подивитися уроки на сьогодні 👁':
+                pass
+
+            elif message.text == 'Подивитися уроки на дату 🗓':
+                pass
 
             elif message.text == 'Додати урок ➕':
                 edit_classes, edit_schedule, add_lesson, delete_lesson, edit_lesson = False, False, True, False, False
-                await bot.send_message(message.chat.id, text='Введіть дату та час уроку\nПриклад: 08.06: 10.00')
+                await bot.send_message(message.chat.id, text='🔡 Введіть дату та час уроку\nПриклад: 08.06: 10.00')
 
             elif message.text == 'Видалити урок ➖':
                 edit_classes, edit_schedule, add_lesson, delete_lesson, edit_lesson = False, False, False, True, False
-                await bot.send_message(message.chat.id, text='Введіть дату та час уроку\nПриклад: 08.06: 10.00')
+                await bot.send_message(message.chat.id, text='🔡 Введіть дату та час уроку\nПриклад: 08.06: 10.00')
 
             elif message.text == 'Змінити урок ✏':
                 edit_classes, edit_schedule, add_lesson, delete_lesson, edit_lesson = False, False, False, False, True
-                await bot.send_message(message.chat.id, text='Введіть дату та час уроку, який треба змінити, '
+                await bot.send_message(message.chat.id, text='🔡 Введіть дату та час уроку, який треба змінити, '
                                                              'на той, на який треба змінити'
                                                              '\nПриклад: 08.06: 10.00 -> 08.06: 16.00')
 
             elif edit_schedule:
                 schedule = message.text.strip()
                 teacher = Teacher(name.split(', ')[-1])
-                teacher.edit_schedule(schedule.lower())
-                await bot.send_message(message.chat.id, text='Розклад змінено')
+                teacher.edit_schedule(schedule)
+                await bot.send_message(message.chat.id, text='Розклад змінено 😆')
                 edit_schedule = False
 
             elif add_lesson:
-                if ':' not in message.text.strip().lower():
-                    await bot.send_message(message.chat.id, text='Неправильний формат дати уроку. Спробуйте ще раз')
+                if ':' not in message.text.strip():
+                    await bot.send_message(message.chat.id, text='❗Неправильний формат дати уроку. Спробуйте ще раз')
                     raise SyntaxError
 
                 teacher = Teacher(name.split(',')[-1].strip())
-                teacher.add_lesson(message.text.strip().lower())
-                await bot.send_message(message.chat.id, text='Урок додано')
+                teacher.add_lesson(message.text.strip())
+                await bot.send_message(message.chat.id, text='Урок додано 😆')
                 add_lesson = False
 
             elif edit_lesson:
-                if '->' not in message.text or not not ':' not in message.text.split('->')[0].strip().lower() \
-                        or ':' not in message.text.strip('->')[0].strip().lower():
-                    await bot.send_message(message.chat.id, text='Неправильний формат дати уроку. Спробуйте ще раз')
+                if '->' not in message.text or not not ':' not in message.text.split('->')[0].strip() \
+                        or ':' not in message.text.strip('->')[0].strip():
+                    await bot.send_message(message.chat.id, text='❗Неправильний формат дати уроку. Спробуйте ще раз')
                     raise SyntaxError
 
                 teacher = Teacher(name.split(',')[-1].strip())
 
                 state = teacher.edit_lesson(
-                    message.text.split('->')[0].strip().lower(),
-                    message.text.split('->')[1].strip().lower()
+                    message.text.split('->')[0].strip(),
+                    message.text.split('->')[1].strip()
                 )
 
-                await bot.send_message(message.chat.id, text='Урок змінено' if state else 'Введеної дати немає в базі')
+                await bot.send_message(message.chat.id,
+                                       text='Урок змінено 😆' if state else '😅 Введеної дати немає в базі')
                 edit_lesson = False
 
             elif delete_lesson:
-                if ':' not in message.text.strip().lower():
-                    await bot.send_message(message.chat.id, text='Неправильний формат дати уроку. Спробуйте ще раз')
+                if ':' not in message.text.strip():
+                    await bot.send_message(message.chat.id, text='❗Неправильний формат дати уроку. Спробуйте ще раз')
                     raise SyntaxError
 
                 teacher = Teacher(name.split(',')[-1].strip())
-                state = teacher.delete_lesson(message.text.strip().lower())
-                await bot.send_message(message.chat.id, text='Урок видалено' if state else 'Такого уроку немає в базі')
+                state = teacher.delete_lesson(message.text.strip())
+                await bot.send_message(message.chat.id,
+                                       text='Урок видалено 😆'if state else '😅 Такого уроку немає в базі')
                 edit_lesson = False
 
             else:
-                await bot.send_message(message.chat.id, text='Команда не вибрана')
+                await bot.send_message(message.chat.id, text='😅 Команда не вибрана')
 
         else:
             if name_expected:
                 if len(message.text.split()) != 2 or '@' not in message.text or ', ' not in message.text \
                         or message.text.index('@') < message.text.index(','):
-                    await bot.send_message(message.chat.id, text='Неправильний формат вводу імені. Спробуйте ще раз')
+                    await bot.send_message(message.chat.id, text='❗Неправильний формат вводу імені. Спробуйте ще раз')
                     raise SyntaxError
 
                 name = message.text.strip()
 
                 subjs_kb = create_kb(
-                    ('Математика', 'subject Математика'),
-                    ('Укр.мова', 'subject Укр.мова'),
-                    ('Англ.мова', 'subject Англ.мова'),
-                    ('Далі ➡️', 'subject Далі ➡️'),
+                    ('Математика', 'subject Математика'), ('Укр.мова', 'subject Укр.мова'),
+                    ('Англ.мова', 'subject Англ.мова'), ('Далі ➡️', 'subject Далі ➡️'),
                     kb_type='inline'
                 )
 
-                await bot.send_message(message.chat.id, text='Виберіть предмети, на яких ви спеціалізуєтесь:',
+                await bot.send_message(message.chat.id, text='🔀 Виберіть предмети, на яких ви спеціалізуєтесь:',
                                        reply_markup=subjs_kb)
 
                 name_expected, selecting_expected = False, True
@@ -233,18 +266,21 @@ async def text_handler(message: types.Message):
                 schedule = message.text.strip()
 
                 teacher = Teacher(name.split(',')[-1].strip())
-                teacher.add_teacher(name=name, subjects=', '.join(subjects), classes=classes, schedule=schedule.strip())
+                teacher.add_teacher(name=name, subjects=', '.join(subjects),
+                                    classes=', '.join(sorted(classes)), schedule=schedule.strip())
 
-                funcs_kb = create_kb('Змінити розклад 📅', 'Змінити класи 🏫')
-                funcs_kb.row(*[btn['text'] for btn in create_kb(
-                    'Додати урок ➕', 'Змінити урок ✏', 'Видалити урок ➖', row_width=3)['keyboard'][0]])
-                await bot.send_message(message.chat.id, text='Вітаю! Вас успішно додано у базу вчителів T&C!',
+                funcs_kb = create_kb(
+                    'Мій розклад 📅', 'Уроки 📚',
+                    'Змінити класи 🏫', 'Налаштування ⚙'
+                )
+
+                await bot.send_message(message.chat.id, text='Вітаю! Вас успішно додано у базу вчителів T&C! 😉',
                                        reply_markup=funcs_kb)
 
                 schedule_expected = False
 
     except (IndexError, ValueError):
-        await bot.send_message(message.chat.id, text='Неправильний формат вхідних даних. Спробуйте ще раз')
+        await bot.send_message(message.chat.id, text='❗Неправильний формат вхідних даних. Спробуйте ще раз')
 
     except SyntaxError:
         pass
@@ -262,7 +298,7 @@ async def subjects_keyboard_callback_data_handler(call: types.CallbackQuery):
             kb_type='inline', tick_places=classes
         )
 
-        await bot.edit_message_text(chat_id=call.message.chat.id, text='Виберіть класи:',
+        await bot.edit_message_text(chat_id=call.message.chat.id, text='🔀 Виберіть класи:',
                                     message_id=call.message.message_id, reply_markup=classes_kb)
 
     else:
@@ -273,16 +309,14 @@ async def subjects_keyboard_callback_data_handler(call: types.CallbackQuery):
             subjects.remove(subj)
 
         subjs_kb = create_kb(
-            ('Математика', 'subject Математика'),
-            ('Укр.мова', 'subject Укр.мова'),
-            ('Англ.мова', 'subject Англ.мова'),
-            ('Далі ➡️', 'subject Далі ➡️'),
+            ('Математика', 'subject Математика'), ('Укр.мова', 'subject Укр.мова'),
+            ('Англ.мова', 'subject Англ.мова'), ('Далі ➡️', 'subject Далі ➡️'),
             kb_type='inline', tick_places=subjects
         )
 
         try:
             await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                        text='Виберіть предмети, на яких ви спеціалізуєтесь:', reply_markup=subjs_kb)
+                                        text='🔀 Виберіть предмети, на яких ви спеціалізуєтесь:', reply_markup=subjs_kb)
         except MessageNotModified:
             pass
 
@@ -293,22 +327,20 @@ async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
 
     if call.data == 'class Назад ⬅️':
         subjs_kb = create_kb(
-            ('Математика', 'subject Математика'),
-            ('Укр.мова', 'subject Укр.мова'),
-            ('Англ.мова', 'subject Англ.мова'),
-            ('Далі ➡️', 'subject Далі ➡️'),
+            ('Математика', 'subject Математика'), ('Укр.мова', 'subject Укр.мова'),
+            ('Англ.мова', 'subject Англ.мова'), ('Далі ➡️', 'subject Далі ➡️'),
             kb_type='inline', tick_places=subjects
         )
 
-        await bot.edit_message_text(chat_id=call.message.chat.id, text='Виберіть предмети, на яких ви спеціалізуєтесь:',
-                                    message_id=call.message.message_id, reply_markup=subjs_kb)
+        await bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                    text='🔀 Виберіть предмети, на яких ви спеціалізуєтесь:', reply_markup=subjs_kb)
 
     elif call.data == 'class Продовжити ➡️':
         if not subjects or not classes:
-            await bot.send_message(call.message.chat.id, text='Не вибрані предмети або класи')
+            await bot.send_message(call.message.chat.id, text='❗Не вибрані предмети або класи')
         else:
-            await bot.send_message(call.message.chat.id, text='Чудово! Тепер створіть свій розклад!')
-            await bot.send_message(call.message.chat.id, text='Напишіть бажаний графік занять '
+            await bot.send_message(call.message.chat.id, text='Чудово! 😀 Тепер створіть свій розклад!')
+            await bot.send_message(call.message.chat.id, text='🔡 Напишіть бажаний графік занять '
                                                               'Кожен день/діапазон днів через ; '
                                                               'Можна через ; та з нового рядочка, як у прикладі\n'
                                                               'Перейти на новий рядочок Shift+Enter\n'
@@ -319,8 +351,8 @@ async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
 
     elif call.data == 'class Підтвердити ✅️':
         teacher = Teacher(name.split(',')[-1].strip())
-        teacher.edit_classes(classes)
-        await bot.send_message(call.message.chat.id, text='Класи змінено')
+        teacher.edit_classes(', '.join(sorted(classes)))
+        await bot.send_message(call.message.chat.id, text='Класи змінено 😆')
 
     else:
         curr_class = call.data.split()[1]
@@ -332,11 +364,11 @@ async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
         if not new_classes_kb:
             classes_kb = create_kb(
                 ('1', 'class 1'), ('2', 'class 2'), ('3', 'class 3'), ('4', 'class 4'), ('5', 'class 5'),
-                ('6', 'class 6'),
-                ('7', 'class 7'), ('8', 'class 8'), ('9', 'class 9'), ('10', 'class 10'), ('11', 'class 11'),
-                ('Назад ⬅️', 'class Назад ⬅️'), ('Продовжити ➡️', 'class Продовжити ➡️'),
+                ('6', 'class 6'), ('7', 'class 7'), ('8', 'class 8'), ('9', 'class 9'), ('10', 'class 10'),
+                ('11', 'class 11'), ('Назад ⬅️', 'class Назад ⬅️'), ('Продовжити ➡️', 'class Продовжити ➡️'),
                 kb_type='inline', tick_places=classes
             )
+
         else:
             classes_kb = create_kb(
                 ('1', 'class 1'), ('2', 'class 2'), ('3', 'class 3'), ('4', 'class 4'), ('5', 'class 5'),
@@ -346,7 +378,7 @@ async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
             )
 
         try:
-            await bot.edit_message_text(chat_id=call.message.chat.id, text='Виберіть класи:',
+            await bot.edit_message_text(chat_id=call.message.chat.id, text='🔀 Виберіть класи:',
                                         message_id=call.message.message_id, reply_markup=classes_kb)
         except MessageNotModified:
             pass
