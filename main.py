@@ -13,7 +13,6 @@ from time import sleep
 
 from typing import Union
 
-
 bot = Bot('1941908944:AAH-74UPpJW4ZcxUwx67lZdDTi_5Sib_S3o')
 dp = Dispatcher(bot)
 
@@ -77,6 +76,26 @@ def remove_ended_lessons():
         db.close()
 
         sleep(60)
+
+
+def check_schedule():
+    try:
+        days = schedule.replace(' ', '').split(';')
+        date_ranges = [day.split(':')[0] for day in days]
+        time_ranges = [day.split(':')[1] for day in days]
+
+        for date_range in date_ranges:
+            for date_rang in date_range.split(','):
+                for date in date_rang.split('-'):
+                    datetime(2021, int(date[date.index('.') + 1:]), int(date[:date.index('.')]))
+
+        for time_range in time_ranges:
+            for time_rang in time_range.split(','):
+                for time in time_rang.split('-'):
+                    datetime(2021, 1, 1, int(time[:time.index('.')]), int(time[time.index('.') + 1:]))
+
+    except:
+        raise IndexError
 
 
 def create_kb(*args, kb_type='reply', row_width=2, resize_keyboard=True, tick_places=None) -> \
@@ -236,7 +255,7 @@ async def text_handler(message: types.Message):
                 teacher = Teacher(name.split(',')[-1].strip())
                 state = teacher.delete_lesson(message.text.strip())
                 await bot.send_message(message.chat.id,
-                                       text='Урок видалено 😆'if state else '😅 Такого уроку немає в базі')
+                                       text='Урок видалено 😆' if state else '😅 Такого уроку немає в базі')
                 edit_lesson = False
 
             else:
@@ -264,6 +283,8 @@ async def text_handler(message: types.Message):
 
             elif schedule_expected:
                 schedule = message.text.strip()
+
+                check_schedule()
 
                 teacher = Teacher(name.split(',')[-1].strip())
                 teacher.add_teacher(name=name, subjects=', '.join(subjects),
