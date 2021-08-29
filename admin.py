@@ -4,10 +4,13 @@ from aiogram import types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+# from threading import Thread
 from datetime import datetime
 from time import sleep
 
 from typing import Union
+
+import json
 
 
 class Admin:
@@ -15,51 +18,67 @@ class Admin:
         self.db = None
         self.nickname = ''
         self.name, self.subjects, self.classes, self.schedule, self.lessons = '', [], [], '', []
-        self.edit_classes, self.edit_schedule, self.add_lesson, self.delete_lesson, self.edit_lesson = False, False, False, False, False
 
-    def switch_user(self, nickname):
-        if self.nickname == nickname or nickname == '@tac_teachers_bot':
-            return
+    @staticmethod
+    def teacher_registered(nickname) -> bool:
+        with open('teachers_vars.json') as f:
+            teachers = json.load(f).keys()
+        return nickname in teachers
 
-        print('vsm')
+    def switch_user(self, nickname) -> None:
+        # def name_thread():
+        #     self.name = self.__getter('name') if self.__getter('name') != 0 else self.name
+        #
+        # def subjects_thread():
+        #     self.subjects = self.__getter('subjects', split=True) \
+        #         if self.__getter('subjects', split=True) != 0 else self.subjects
+        #
+        # def classes_thread():
+        #     self.classes = self.__getter('classes', split=True) \
+        #         if self.__getter('classes', split=True) != 0 else self.classes
+        #
+        # def schedule_thread():
+        #     self.schedule = self.__getter('schedule') if self.__getter('schedule') != 0 else self.schedule
+        #
+        # def lessons_thread():
+        #     self.lessons = self.__getter('lessons', split=True) \
+        #         if self.__getter('lessons', split=True) != 0 else self.lessons
+        #
+        # self.nickname = nickname
+        #
+        # self.__connect_database()
+        #
+        # Thread(target=name_thread).start()
+        # Thread(target=subjects_thread).start()
+        # Thread(target=classes_thread).start()
+        # Thread(target=schedule_thread).start()
+        # Thread(target=lessons_thread).start()
+        #
+        # print(f'{self.name}\n{self.subjects}\n{self.classes}\n{self.schedule}')
+        #
+        # self.__close_database()
+
+        self.__connect_database()
 
         self.nickname = nickname
 
-        self.name = self.getter('name') if self.getter('name') != 0 else self.name
-        self.subjects = self.getter('subjects', split=True) if self.getter('subjects', split=True) != 0 else self.subjects
-        self.classes = self.getter('classes', split=True) if self.getter('classes', split=True) != 0 else self.classes
-        self.schedule = self.getter('schedule') if self.getter('schedule') != 0 else self.schedule
-        self.lessons = self.getter('lessons', split=True) if self.getter('lessons', split=True) != 0 else self.lessons
+        self.name = self.__getter('name') if self.__getter('name') != 0 else self.name
+        self.subjects = self.__getter('subjects', split=True) \
+            if self.__getter('subjects', split=True) != 0 else self.subjects
+        self.classes = self.__getter('classes', split=True) \
+            if self.__getter('classes', split=True) != 0 else self.classes
+        self.schedule = self.__getter('schedule') if self.__getter('schedule') != 0 else self.schedule
+        self.lessons = self.__getter('lessons', split=True) \
+            if self.__getter('lessons', split=True) != 0 else self.lessons
 
-        try:
-            self.edit_classes, self.edit_schedule, self.add_lesson, self.delete_lesson, self.edit_lesson = self.getter(
-                'vars', split=True) if self.getter('vars', split=True) != 0 \
-                else self.edit_classes, self.edit_schedule, self.add_lesson, self.delete_lesson, self.edit_lesson
-        except ValueError:
-            pass
-
-    def update_teacher_vars(self):
-        self.__connect_database()
-
-        with self.db.cursor() as cursor:
-            cursor.execute(f'UPDATE `T&C_teachers` SET vars = "{self.edit_classes}, {self.edit_schedule}, '
-                           f'{self.add_lesson}, {self.delete_lesson}, {self.edit_lesson}" '
-                           f'WHERE name LIKE "%{self.nickname}"')
+        print(f'{self.name}\n{self.subjects}\n{self.classes}\n{self.schedule}\n{self.lessons}\n')
 
         self.__close_database()
 
-    def getter(self, obj, split=False) -> Union[str, list]:
-        self.__connect_database()
-
-        with self.db.cursor() as cursor:
-            cursor.execute(f'SELECT {obj} FROM `T&C_teachers` WHERE name LIKE "%{self.nickname}" ')
-            found_obj = cursor.fetchall()
-
-        self.__close_database()
-
-        print(found_obj)
-
-        return 0 if not found_obj else found_obj[0] if not split else found_obj.split(',')
+    @staticmethod
+    def update_teacher_vars(teachers_vars: dict) -> None:
+        with open('teachers_vars.json', 'w') as f:
+            json.dump(teachers_vars, f)
 
     @staticmethod
     def remove_ended_lessons() -> None:
@@ -173,7 +192,16 @@ class Admin:
 
         self.__close_database()
 
-    def _edit_classes(self, new_classes) -> None:
+    def delete_teacher(self, nickname):
+        self.__connect_database()
+
+        with self.db.cursor() as cursor:
+            cursor.execute(f'DELETE FROM `T&C_teachers` WHERE name LIKE "%{nickname}"')
+            self.db.commit()
+
+        self.__close_database()
+
+    def edit_classes(self, new_classes) -> None:
         self.__connect_database()
 
         with self.db.cursor() as cursor:
@@ -183,17 +211,17 @@ class Admin:
 
         self.__close_database()
 
-    def _edit_schedule(self, new_schedule) -> None:
+    def edit_schedule(self, new_schedule) -> None:
         self.__connect_database()
 
         with self.db.cursor() as cursor:
-            cursor.execute(f'UPDATE `T&C_teachers` SET schedule = "{new_schedule.lower()}" '
+            cursor.execute(f'UPDATE `T&C_teachers` SET schedule = "{new_schedule}" '
                            f'WHERE name LIKE "%{self.nickname}"')
             self.db.commit()
 
         self.__close_database()
 
-    def _add_lesson(self, lesson_time) -> None:
+    def add_lesson(self, lesson_time) -> None:
         self.__connect_database()
 
         with self.db.cursor() as cursor:
@@ -203,7 +231,7 @@ class Admin:
 
         self.__close_database()
 
-    def _edit_lesson(self, old_lesson_time, new_lesson_time) -> bool:
+    def edit_lesson(self, old_lesson_time, new_lesson_time) -> bool:
         self.__connect_database()
 
         with self.db.cursor() as cursor:
@@ -220,7 +248,7 @@ class Admin:
 
         return state
 
-    def _delete_lesson(self, lesson_time) -> bool:
+    def delete_lesson(self, lesson_time) -> bool:
         self.__connect_database()
 
         with self.db.cursor() as cursor:
@@ -237,6 +265,16 @@ class Admin:
 
         return state
 
+    def __getter(self, obj: str, split=False) -> Union[str, list]:
+        with self.db.cursor() as cursor:
+            cursor.execute(f'SELECT {obj} FROM `T&C_teachers` WHERE name LIKE "%{self.nickname}" ')
+            found_obj = cursor.fetchall()
+
+        try:
+            return 0 if not found_obj else found_obj[0][0] if not split else found_obj[0][0].split(',')
+        except AttributeError:
+            pass
+
     def __connect_database(self):
         self.db = pymysql.connect(
             host='us-cdbr-east-04.cleardb.com',
@@ -247,12 +285,3 @@ class Admin:
 
     def __close_database(self):
         self.db.close()
-
-    def __delete_teacher(self, nickname):
-        self.__connect_database()
-
-        with self.db.cursor() as cursor:
-            cursor.execute(f'DELETE FROM `T&C_teachers` WHERE name LIKE "%{nickname}"')
-            self.db.commit()
-
-        self.__close_database()
