@@ -18,11 +18,16 @@ class Admin:
         self.nickname = ''
         self.name, self.subjects, self.classes, self.schedule, self.lessons = '', [], [], '', []
 
-    @staticmethod
-    def teacher_registered(nickname) -> bool:
-        with open('teachers_vars.json') as f:
-            teachers = json.load(f).keys()
-        return nickname in teachers
+    def teacher_registered(self, nickname) -> bool:
+        self.__connect_database()
+
+        with self.db.cursor() as cursor:
+            cursor.execute(f'SELECT name FROM `T&C_teachers` WHERE name LIKE "%{nickname}"')
+            teachers = cursor.fetchall()
+
+        self.__close_database()
+
+        return True if teachers else False
 
     def switch_user(self, nickname) -> None:
         self.nickname = nickname

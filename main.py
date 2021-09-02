@@ -201,8 +201,8 @@ async def text_handler(message: types.Message):
 
                     admin.schedule = message.text.strip()
 
-                    admin.add_teacher(name=admin.name, subjects=', '.join(admin.subjects),
-                                      classes=','.join(sorted(admin.classes)), schedule=admin.schedule.strip())
+                    admin.add_teacher(name=admin.name, subjects=', '.join(set(admin.subjects)),
+                                      classes=','.join(sorted(set(admin.classes))), schedule=admin.schedule.strip())
 
                     funcs_kb = admin.create_kb(
                         'Мій розклад 📅', 'Уроки 📚',
