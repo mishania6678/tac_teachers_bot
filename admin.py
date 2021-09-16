@@ -6,16 +6,18 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from typing import Union
 
-# import threading
 import datetime
 import time
 import json
 
 
+YEAR = 2021
+
+
 class Admin:
-    def __init__(self):
+    def __init__(self, nickname=''):
         self.db = None
-        self.nickname = ''
+        self.nickname = nickname
         self.name, self.subjects, self.classes, self.schedule, self.lessons = '', [], [], '', []
 
     def teacher_registered(self, nickname) -> bool:
@@ -32,13 +34,14 @@ class Admin:
     def switch_user(self, nickname) -> None:
         self.nickname = nickname
 
+        # if not self.teacher_registered(previous_nickname):
         teacher_info = self.__getter()
         self.subjects = teacher_info[0][1].split(',') if teacher_info else self.subjects
         self.classes = teacher_info[0][2].split(',') if teacher_info else self.classes
-        self.schedule = teacher_info[0][3].split(',') if teacher_info else self.schedule
+        self.schedule = teacher_info[0][3] if teacher_info else self.schedule
         self.lessons = teacher_info[0][4].split('; ') if teacher_info else self.lessons
 
-    def reinitialize_teacher_vars(self, teacher_vars: dict, except_var=None) -> dict:
+    def reset_teacher_vars(self, teacher_vars: dict, except_var=None) -> dict:
         all_vars = [
             'name_expected', 'selecting_expected', 'schedule_expected',
             'edit_classes', 'edit_schedule', 'add_lesson', 'edit_lesson', 'delete_lesson',
@@ -68,7 +71,7 @@ class Admin:
             hour = int(lesson_time.split('.')[0].strip()) + 1
             minutes = int(lesson_time.split('.')[1].strip())
 
-            return curr_datetime > datetime.datetime(2021, month, day, hour, minutes)
+            return curr_datetime > datetime.datetime(YEAR, month, day, hour, minutes)
 
         while True:
             db = pymysql.connect(
@@ -86,27 +89,31 @@ class Admin:
             with db.cursor() as cursor:
                 cursor.execute('SELECT * FROM `T&C_teachers`')
                 rows = cursor.fetchall()
-                for row in rows:
-                    for lesson_datetime in row[4][:-1].split(';'):
-                        lesson_datetime = lesson_datetime.strip()
-                        try:
-                            if not row[4]:
-                                raise SyntaxError
+                try:
+                    for row in rows:
+                        for lesson_datetime in row[4][:-1].split(';'):
+                            lesson_datetime = lesson_datetime.strip()
+                            try:
+                                if not row[4]:
+                                    raise SyntaxError
 
-                            if lesson_ended():
-                                self.lessons.remove(lesson_datetime)
-                                cursor.execute(f'UPDATE `T&C_teachers` SET lessons = '
-                                               f'REPLACE(lessons, "{lesson_datetime};", "") WHERE name = "{row[0]}"')
+                                if lesson_ended():
+                                    self.lessons.remove(lesson_datetime)
+                                    cursor.execute(f'UPDATE `T&C_teachers` SET lessons = REPLACE(lessons, '
+                                                   f'"{lesson_datetime};", "") WHERE name = "{row[0]}"')
+                                    db.commit()
+
+                            except (IndexError, ValueError):
+                                cursor.execute(
+                                    f'UPDATE `T&C_teachers` SET lessons = REPLACE(lessons, "{lesson_datetime};", "") '
+                                    f'WHERE name = "{row[0]}"')
                                 db.commit()
 
-                        except (IndexError, ValueError):
-                            cursor.execute(
-                                f'UPDATE `T&C_teachers` SET lessons = REPLACE(lessons, "{lesson_datetime};", "") '
-                                f'WHERE name = "{row[0]}"')
-                            db.commit()
+                            except SyntaxError:
+                                pass
 
-                        except SyntaxError:
-                            pass
+                except TypeError:
+                    pass
 
             db.close()
 
@@ -122,12 +129,12 @@ class Admin:
             for date_range in date_ranges:
                 for date_rang in date_range.split(','):
                     for date in date_rang.split('-'):
-                        datetime.datetime(2021, int(date[date.index('.') + 1:]), int(date[:date.index('.')]))
+                        datetime.datetime(YEAR, int(date[date.index('.') + 1:]), int(date[:date.index('.')]))
 
             for time_range in time_ranges:
                 for time_rang in time_range.split(','):
                     for time in time_rang.split('-'):
-                        datetime.datetime(2021, 1, 1, int(time[:time.index('.')]), int(time[time.index('.') + 1:]))
+                        datetime.datetime(YEAR, 1, 1, int(time[:time.index('.')]), int(time[time.index('.') + 1:]))
 
         except:
             raise IndexError
@@ -159,14 +166,19 @@ class Admin:
 
         return kb
 
-    def add_teacher(self, name, subjects, classes, schedule, lessons='') -> None:
+    def add_teacher_data(self, data_type, data) -> None:
         self.__connect_database()
 
-        with self.db.cursor() as cursor:
-            cursor.execute('INSERT INTO `T&C_teachers` (name, subjects, classes, schedule, lessons) '
-                           f'VALUES ("{name.lower()}", "{subjects}", "{classes}", '
-                           f'"{schedule.lower()}", "{lessons.lower()}")')
-            self.db.commit()
+        if data_type != 'name':
+            with self.db.cursor() as cursor:
+                cursor.execute(f'UPDATE `T&C_teachers` SET {data_type} = "{data}"'
+                               f'WHERE name LIKE "%{self.nickname}"')
+                self.db.commit()
+        else:
+            with self.db.cursor() as cursor:
+                cursor.execute(f'INSERT INTO `T&C_teachers` ({data_type}, subjects, classes, schedule, lessons) '
+                               f'VALUES ("{data}", "", "", "", "")')
+                self.db.commit()
 
         self.__close_database()
 
@@ -179,21 +191,11 @@ class Admin:
 
         self.__close_database()
 
-    def edit_classes(self, new_classes) -> None:
+    def edit_teacher_data(self, data_type, new_data):
         self.__connect_database()
 
         with self.db.cursor() as cursor:
-            cursor.execute(f'UPDATE `T&C_teachers` SET classes = "{new_classes}"'
-                           f'WHERE name LIKE "%{self.nickname}"')
-            self.db.commit()
-
-        self.__close_database()
-
-    def edit_schedule(self, new_schedule) -> None:
-        self.__connect_database()
-
-        with self.db.cursor() as cursor:
-            cursor.execute(f'UPDATE `T&C_teachers` SET schedule = "{new_schedule}" '
+            cursor.execute(f'UPDATE `T&C_teachers` SET {data_type} = "{new_data}"'
                            f'WHERE name LIKE "%{self.nickname}"')
             self.db.commit()
 
@@ -279,3 +281,7 @@ class Admin:
 
     def __close_database(self) -> None:
         self.db.close()
+
+
+# admin = Admin(nickname='@wargkul')
+# admin.delete_teacher('wargkul')
