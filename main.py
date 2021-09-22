@@ -19,8 +19,7 @@ current_user = None
 async def start(message: types.Message):
     global current_user
 
-    teachers = ['wargkul', 'nizhnitschek', 'maxbenival']
-    if message.from_user.username not in teachers:
+    if not admin.is_teacher(f'@{message.from_user.username}'):
         await bot.send_message(message.chat.id, text='⚠ Цим ботом можуть користуватися лише викладачі онлайн-школи T&C')
 
     if admin.teacher_registered(f'@{message.from_user.username}'):
