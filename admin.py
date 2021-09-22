@@ -10,7 +10,6 @@ import datetime
 import time
 import json
 
-
 YEAR = 2021
 
 
@@ -19,6 +18,17 @@ class Admin:
         self.db = None
         self.nickname = nickname
         self.name, self.subjects, self.classes, self.schedule, self.lessons = '', [], [], '', []
+
+    def is_teacher(self, nickname) -> bool:
+        self.__connect_database()
+
+        with self.db.cursor() as cursor:
+            cursor.execute('SELECT nickname FROM `T&C_teachers_nicknames`')
+            all_teachers_nicknames = cursor.fetchall()
+
+        self.__close_database()
+
+        return nickname in [''.join(nickname) for nickname in all_teachers_nicknames]
 
     def teacher_registered(self, nickname) -> bool:
         self.__connect_database()
@@ -191,6 +201,17 @@ class Admin:
 
         self.__close_database()
 
+        with open('teachers_vars.json') as f:
+            teachers_vars = json.load(f)
+
+        for key in teachers_vars.keys():
+            if key == nickname:
+                teachers_vars.pop(key, None)
+                break
+
+        with open('teachers_vars.json', 'w') as f:
+            json.dump(teachers_vars, f)
+
     def edit_teacher_data(self, data_type, new_data):
         self.__connect_database()
 
@@ -259,6 +280,27 @@ class Admin:
         self.__close_database()
 
         return lessons_on_date if lessons_on_date else 'Не заплановано ніяких уроків'
+
+    def add_teachers_in_school(self, *args):
+        self.__connect_database()
+
+        for nickname in args:
+            with self.db.cursor() as cursor:
+                cursor.execute(f'INSERT INTO `T&C_teachers_nicknames` (nickname) VALUES ("{nickname}")')
+                cursor.execute('SELECT nickname FROM `T&C_teachers_nicknames`')
+                self.db.commit()
+
+        self.__close_database()
+
+    def delete_teachers_from_school(self, *args):
+        self.__connect_database()
+
+        for nickname in args:
+            with self.db.cursor() as cursor:
+                cursor.execute(f'DELETE FROM `T&C_teachers_nicknames` WHERE nickname LIKE "%{nickname}"')
+                self.db.commit()
+
+        self.__close_database()
 
     def __getter(self) -> tuple:
         self.__connect_database()
