@@ -12,22 +12,24 @@ dp = Dispatcher(bot)
 
 admin = Admin()
 
-current_user = None
+CURRENT_USER = None
 
 
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    global current_user
+    global CURRENT_USER
 
     if not admin.is_teacher(f'@{message.from_user.username}'):
         await bot.send_message(message.chat.id, text='⚠ Цим ботом можуть користуватися лише викладачі онлайн-школи T&C')
 
-    if admin.teacher_registered(f'@{message.from_user.username}'):
-        if current_user != f'@{message.from_user.username}' and current_user != '@tac_teachers_bot':
-            current_user = f'@{message.from_user.username}'
-            admin.switch_user(f'@{message.from_user.username}')
+    elif admin.teacher_registered(f'@{message.from_user.username}'):
+        if CURRENT_USER != f'@{message.from_user.username}' and CURRENT_USER != '@tac_teachers_bot':
+            CURRENT_USER = f'@{message.from_user.username}'
+            admin.switch_user(CURRENT_USER)
 
     else:
+        admin.__init__()
+
         with open('teachers_vars.json') as fr:
             curr_teachers_vars = json.load(fr)
 
@@ -49,18 +51,18 @@ async def start(message: types.Message):
 
 @dp.message_handler(content_types=['text'])
 async def text_handler(message: types.Message):
-    global current_user
+    global CURRENT_USER
 
-    if current_user != f'@{message.from_user.username}' and f'@{message.from_user.username}' != '@tac_teachers_bot':
-        current_user = f'@{message.from_user.username}'
-        admin.switch_user(f'@{message.from_user.username}')
+    if CURRENT_USER != f'@{message.from_user.username}' and f'@{message.from_user.username}' != '@tac_teachers_bot':
+        CURRENT_USER = f'@{message.from_user.username}'
+        admin.switch_user(CURRENT_USER)
 
     try:
         with open('teachers_vars.json') as f:
             teachers_vars = json.load(f)
 
-            if not (teachers_vars[current_user]['name_expected'] or teachers_vars[current_user]['selecting_expected']
-                    or teachers_vars[current_user]['schedule_expected']):
+            if not (teachers_vars[CURRENT_USER]['name_expected'] or teachers_vars[CURRENT_USER]['selecting_expected']
+                    or teachers_vars[CURRENT_USER]['schedule_expected']):
                 if message.text == 'Назад ⬅️':
                     funcs_kb = admin.create_kb(
                         'Мій розклад 📅', 'Уроки 📚',
@@ -86,7 +88,7 @@ async def text_handler(message: types.Message):
                     await bot.send_message(message.chat.id, text='.', reply_markup=lessons_kb)
 
                 elif message.text == 'Змінити класи 🏫':
-                    teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='new_classes_kb')
+                    teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='new_classes_kb')
 
                     classes_kb = admin.create_kb(
                         ('1', 'class 1'), ('2', 'class 2'), ('3', 'class 3'), ('4', 'class 4'), ('5', 'class 5'),
@@ -101,7 +103,7 @@ async def text_handler(message: types.Message):
                     pass
 
                 elif message.text == 'Змінити розклад 📋':
-                    teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='edit_schedule')
+                    teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='edit_schedule')
                     await bot.send_message(message.chat.id, text=f'🔡 Відправте відредагований розклад\n'
                                                                  f'`{admin.schedule}`', parse_mode='Markdown')
 
@@ -109,42 +111,42 @@ async def text_handler(message: types.Message):
                     await bot.send_message(message.chat.id, text=admin.show_lessons())
 
                 elif message.text == 'Подивитися уроки на дату 🗓':
-                    teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='show_lessons_on_date')
+                    teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='show_lessons_on_date')
                     await bot.send_message(message.chat.id, text='🔡 Введіть дату')
 
                 elif message.text == 'Додати урок ➕':
-                    teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='add_lesson')
+                    teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='add_lesson')
                     await bot.send_message(message.chat.id, text='🔡 Введіть дату та час уроку\nПриклад: 08.06: 10.00')
 
                 elif message.text == 'Видалити урок ➖':
-                    teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='delete_lesson')
+                    teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='delete_lesson')
                     await bot.send_message(message.chat.id, text='🔡 Введіть дату та час уроку\nПриклад: 08.06: 10.00')
 
                 elif message.text == 'Змінити урок ✏':
-                    teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='edit_lesson')
+                    teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='edit_lesson')
                     await bot.send_message(message.chat.id, text='🔡 Введіть дату та час уроку, який треба змінити, '
                                                                  'на той, на який треба змінити'
                                                                  '\nПриклад: 08.06: 10.00 -> 08.06: 16.00')
 
-                elif teachers_vars[current_user]['edit_schedule']:
+                elif teachers_vars[CURRENT_USER]['edit_schedule']:
                     admin.check_schedule(message.text.strip())
 
                     admin.schedule = message.text.strip()
 
-                    admin.edit_schedule(admin.schedule)
+                    admin.edit_teacher_data('schedule', ''.join(admin.schedule))
                     await bot.send_message(message.chat.id, text='Розклад змінено 😆')
 
-                    teachers_vars[current_user]['edit_schedule'] = False
+                    teachers_vars[CURRENT_USER]['edit_schedule'] = False
 
-                elif teachers_vars[current_user]['add_lesson']:
+                elif teachers_vars[CURRENT_USER]['add_lesson']:
                     admin.check_schedule(message.text.strip())
 
                     admin.lessons.append(message.text.strip())
                     admin.add_lesson(message.text.strip())
                     await bot.send_message(message.chat.id, text='Урок додано 😆')
-                    teachers_vars[current_user]['add_lesson'] = False
+                    teachers_vars[CURRENT_USER]['add_lesson'] = False
 
-                elif teachers_vars[current_user]['edit_lesson']:
+                elif teachers_vars[CURRENT_USER]['edit_lesson']:
                     admin.check_schedule(message.text.split('->')[0].strip())
                     admin.check_schedule(message.text.split('->')[1].strip())
 
@@ -157,25 +159,25 @@ async def text_handler(message: types.Message):
 
                     await bot.send_message(message.chat.id,
                                            text='Урок змінено 😆' if state else '😅 Введеної дати немає в базі')
-                    teachers_vars[current_user]['edit_lesson'] = False
+                    teachers_vars[CURRENT_USER]['edit_lesson'] = False
 
-                elif teachers_vars[current_user]['delete_lesson']:
+                elif teachers_vars[CURRENT_USER]['delete_lesson']:
                     admin.check_schedule(message.text.strip())
 
                     admin.lessons.remove(message.text.strip())
                     state = admin.delete_lesson(message.text.strip())
                     await bot.send_message(message.chat.id,
                                            text='Урок видалено 😆' if state else '😅 Такого уроку немає в базі')
-                    teachers_vars[current_user]['delete_lesson'] = False
+                    teachers_vars[CURRENT_USER]['delete_lesson'] = False
 
-                elif teachers_vars[current_user]['show_lessons_on_date']:
+                elif teachers_vars[CURRENT_USER]['show_lessons_on_date']:
                     await bot.send_message(message.chat.id, text=admin.show_lessons(date=message.text.strip()))
 
                 else:
                     await bot.send_message(message.chat.id, text='😅 Команда не вибрана')
 
             else:
-                if teachers_vars[current_user]['name_expected']:
+                if teachers_vars[CURRENT_USER]['name_expected']:
                     if len(message.text.split()) != 2 or '@' not in message.text or ', ' not in message.text \
                             or message.text.index('@') < message.text.index(','):
                         await bot.send_message(message.chat.id,
@@ -183,6 +185,7 @@ async def text_handler(message: types.Message):
                         raise SyntaxError
 
                     admin.name = message.text.strip()
+                    admin.add_teacher_data('name', admin.name)
 
                     subjs_kb = admin.create_kb(
                         ('Математика', 'subject Математика'), ('Укр.мова', 'subject Укр.мова'),
@@ -193,15 +196,13 @@ async def text_handler(message: types.Message):
                     await bot.send_message(message.chat.id, text='🔀 Виберіть предмети, на яких ви спеціалізуєтесь:',
                                            reply_markup=subjs_kb)
 
-                    teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='selecting_expected')
+                    teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='selecting_expected')
 
-                elif teachers_vars[current_user]['schedule_expected']:
+                elif teachers_vars[CURRENT_USER]['schedule_expected']:
                     admin.check_schedule(message.text.strip())
 
                     admin.schedule = message.text.strip()
-
-                    admin.add_teacher(name=admin.name, subjects=', '.join(set(admin.subjects)),
-                                      classes=','.join(sorted(set(admin.classes))), schedule=admin.schedule.strip())
+                    admin.add_teacher_data('schedule', admin.schedule)
 
                     funcs_kb = admin.create_kb(
                         'Мій розклад 📅', 'Уроки 📚',
@@ -211,7 +212,7 @@ async def text_handler(message: types.Message):
                     await bot.send_message(message.chat.id, text='Вітаю! Вас успішно додано у базу вчителів T&C! 😉',
                                            reply_markup=funcs_kb)
 
-                    teachers_vars[current_user]['schedule_expected'] = False
+                    teachers_vars[CURRENT_USER]['schedule_expected'] = False
 
         admin.update_teacher_vars(teachers_vars)
 
@@ -224,12 +225,7 @@ async def text_handler(message: types.Message):
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('subject'))
 async def subjects_keyboard_callback_data_handler(call: types.CallbackQuery):
-    global current_user
-
-    if current_user != f'@{call.message.from_user.username}' \
-            and f'@{call.message.from_user.username}' != '@tac_teachers_bot':
-        current_user = f'@{call.message.from_user.username}'
-        admin.switch_user(f'@{call.message.from_user.username}')
+    global CURRENT_USER
 
     if call.data == 'subject Далі ➡️':
         classes_kb = admin.create_kb(
@@ -261,15 +257,12 @@ async def subjects_keyboard_callback_data_handler(call: types.CallbackQuery):
         except MessageNotModified:
             pass
 
+        admin.edit_teacher_data('subjects', ', '.join(admin.subjects))
+
 
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith('class'))
 async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
-    global current_user
-
-    if current_user != f'@{call.message.from_user.username}' \
-            and f'@{call.message.from_user.username}' != '@tac_teachers_bot':
-        current_user = f'@{call.message.from_user.username}'
-        admin.switch_user(f'@{call.message.from_user.username}')
+    global CURRENT_USER
 
     with open('teachers_vars.json') as f:
         teachers_vars = json.load(f)
@@ -289,17 +282,22 @@ async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
                 await bot.send_message(call.message.chat.id, text='❗Не вибрані предмети або класи')
             else:
                 await bot.send_message(call.message.chat.id, text='Чудово! 😀 Тепер створіть свій розклад!')
-                await bot.send_message(call.message.chat.id, text='🔡 Напишіть бажаний графік занять '
-                                                                  'Кожен день/діапазон днів через ; '
-                                                                  'Можна через ; та з нового рядочка, як у прикладі\n'
-                                                                  'Перейти на новий рядочок Shift+Enter\n'
-                                                                  'Приклад:\n'
-                                                                  '08.06-10.06: 10.00-19.00;\n11.06: 12.00-16.00;\n'
-                                                                  '12.06: 13.00-21.00;\n13.06, 14.06: 8.00-19.00')
-                teachers_vars = admin.reinitialize_teacher_vars(teachers_vars, except_var='schedule_expected')
+                await bot.send_message(call.message.chat.id,
+                                       text='🔡Введіть бажаний графік занять, як показано на прикладі:\n'
+                                            '❗️Дотримуйтесь зазначеного синтаксису, '
+                                            'адже навіть якщо десь буде зайва кома, '
+                                            'бот не зможе зчитати повідомлення.\n'
+                                            'Дата(день та місяць) або період дат: години роботи.\n '
+                                            'Приклад:\n'
+                                            '08.09-10.09: 10.00-19.00;\n'
+                                            '11.09: 12.00-16.00;\n'
+                                            '12.06: 13.00-21.00;\n'
+                                            '13.06, 14.06: 08.00-19.00\n')
+                teachers_vars = admin.reset_teacher_vars(teachers_vars, except_var='schedule_expected')
+                admin.edit_teacher_data('classes', ','.join(sorted(admin.classes)))
 
         elif call.data == 'class Підтвердити ✅️':
-            admin.edit_classes(','.join(sorted(admin.classes)))
+            admin.edit_teacher_data('classes', ','.join(sorted(admin.classes)))
             await bot.send_message(call.message.chat.id, text='Класи змінено 😆')
 
         else:
@@ -309,7 +307,7 @@ async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
             else:
                 admin.classes.remove(curr_class)
 
-            if not teachers_vars[current_user]['new_classes_kb']:
+            if not teachers_vars[CURRENT_USER]['new_classes_kb']:
                 classes_kb = admin.create_kb(
                     ('1', 'class 1'), ('2', 'class 2'), ('3', 'class 3'), ('4', 'class 4'), ('5', 'class 5'),
                     ('6', 'class 6'), ('7', 'class 7'), ('8', 'class 8'), ('9', 'class 9'), ('10', 'class 10'),
@@ -330,6 +328,8 @@ async def classes_keyboard_callback_data_handler(call: types.CallbackQuery):
                                             message_id=call.message.message_id, reply_markup=classes_kb)
             except MessageNotModified:
                 pass
+
+            admin.edit_teacher_data('classes', ','.join(sorted(admin.classes)))
 
     admin.update_teacher_vars(teachers_vars)
 
