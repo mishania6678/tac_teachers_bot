@@ -8,7 +8,7 @@ from typing import Union
 
 import datetime
 import time
-import json
+import ast
 
 YEAR = 2021
 
@@ -17,7 +17,7 @@ class Admin:
     def __init__(self, nickname=''):
         self.db = None
         self.nickname = nickname
-        self.name, self.subjects, self.classes, self.schedule, self.lessons = '', [], [], '', []
+        self.name, self.subjects, self.classes, self.schedule, self.lessons, self.memory = '', [], [], '', [], {}
 
     def is_teacher(self, nickname) -> bool:
         self.__connect_database()
@@ -44,14 +44,14 @@ class Admin:
     def switch_user(self, nickname) -> None:
         self.nickname = nickname
 
-        # if not self.teacher_registered(previous_nickname):
         teacher_info = self.__getter()
         self.subjects = teacher_info[0][1].split(',') if teacher_info else self.subjects
         self.classes = teacher_info[0][2].split(',') if teacher_info else self.classes
         self.schedule = teacher_info[0][3] if teacher_info else self.schedule
         self.lessons = teacher_info[0][4].split('; ') if teacher_info else self.lessons
+        self.memory = ast.literal_eval(teacher_info[0][5]) if teacher_info else self.memory
 
-    def reset_teacher_vars(self, teacher_vars: dict, except_var=None) -> dict:
+    def reset_teacher_vars(self, except_var=None):
         all_vars = [
             'name_expected', 'selecting_expected', 'schedule_expected',
             'edit_classes', 'edit_schedule', 'add_lesson', 'edit_lesson', 'delete_lesson',
@@ -59,17 +59,20 @@ class Admin:
         ]
 
         for var in all_vars:
-            teacher_vars[self.nickname][var] = False
+            self.memory[var] = False
 
         if except_var is not None:
-            teacher_vars[self.nickname][except_var] = True
+            self.memory[except_var] = True
 
-        return teacher_vars
+    def update_teacher_vars(self) -> None:
+        self.__connect_database()
 
-    @staticmethod
-    def update_teacher_vars(teachers_vars: dict) -> None:
-        with open('teachers_vars.json', 'w') as f:
-            json.dump(teachers_vars, f)
+        with self.db.cursor() as cursor:
+            cursor.execute(f'''UPDATE `T&C_teachers` SET memory = "{str(self.memory)}"
+             WHERE name LIKE "%{self.nickname}"''')
+            self.db.commit()
+
+        self.__close_database()
 
     def remove_ended_lessons(self) -> None:
         def lesson_ended():
@@ -201,17 +204,6 @@ class Admin:
 
         self.__close_database()
 
-        with open('teachers_vars.json') as f:
-            teachers_vars = json.load(f)
-
-        for key in teachers_vars.keys():
-            if key == nickname:
-                teachers_vars.pop(key, None)
-                break
-
-        with open('teachers_vars.json', 'w') as f:
-            json.dump(teachers_vars, f)
-
     def edit_teacher_data(self, data_type, new_data):
         self.__connect_database()
 
@@ -325,5 +317,5 @@ class Admin:
         self.db.close()
 
 
-# admin = Admin(nickname='@wargkul')
-# admin.delete_teacher('wargkul')
+# admin = Admin()
+# admin.delete_teacher('nizhnitschek')
