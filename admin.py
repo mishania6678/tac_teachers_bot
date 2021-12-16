@@ -318,4 +318,4 @@ class Admin:
 
 
 # admin = Admin()
-# admin.delete_teacher('nizhnitschek')
+# admin.delete_teacher('wargkul')
