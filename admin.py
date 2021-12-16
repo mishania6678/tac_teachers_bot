@@ -317,5 +317,5 @@ class Admin:
         self.db.close()
 
 
-admin = Admin()
-admin.delete_teacher('wargkul')
+#admin = Admin()
+#admin.delete_teacher('wargkul')
