@@ -1,11 +1,12 @@
 from aiogram import Bot, Dispatcher, types, executor
 from aiogram.utils.exceptions import MessageNotModified
 
+import tac_teachers_bot.config
 from admin import Admin
 
 import threading
 
-bot = Bot('1941908944:AAH-74UPpJW4ZcxUwx67lZdDTi_5Sib_S3o')
+bot = Bot(tac_teachers_bot.config.token)
 dp = Dispatcher(bot)
 
 admin = Admin()

@@ -10,6 +10,8 @@ import datetime
 import time
 import ast
 
+import tac_teachers_bot.config
+
 YEAR = 2021
 
 
@@ -308,9 +310,9 @@ class Admin:
     def __connect_database(self) -> None:
         self.db = pymysql.connect(
             host='us-cdbr-east-04.cleardb.com',
-            user='b1c96c8af48cba',
-            password='c13f73de',
-            database='heroku_805235abf2a3a56'
+            user=tac_teachers_bot.config.db_user,
+            password=tac_teachers_bot.config.db_pass,
+            database=tac_teachers_bot.config.db_db
         )
 
     def __close_database(self) -> None:
